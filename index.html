@@ -1,0 +1,912 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Buscador de CNPJs - Seguro</title>
+<link href="https://fonts.googleapis.com/css?family=Roboto:700" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<style>
+:root{
+  --magalu-blue:#4ec7f3;
+  --red:#DC143C;
+  --bg:#fff;
+  --accent:#009688;
+  --muted:#999;
+  --white:#fff;
+  --footer-height:64px;
+  --base-font:16px;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{height:100%;}
+body{
+  font-family:Roboto, sans-serif;
+  background:linear-gradient(135deg,#4ec7f3,#42c58a);
+  -webkit-font-smoothing:antialiased;
+  -moz-osx-font-smoothing:grayscale;
+}
+
+/* ===== LOGIN ===== */
+#login-container{
+  position:fixed;
+  inset:0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  z-index:9999;
+}
+#login-card{
+  background:rgba(255,255,255,0.98);
+  padding:2.25rem 1.75rem;
+  border-radius:12px;
+  width:360px;
+  box-shadow:0 20px 60px rgba(0,0,0,0.25);
+  text-align:center;
+}
+#login-card h1{font-size:1.5rem;margin-bottom:1rem;color:#333}
+.input-group{margin-bottom:1rem;text-align:left}
+.input-group label{display:block;font-weight:700;margin-bottom:.25rem;color:#333}
+.input-group input{width:100%;padding:.65rem;border-radius:.5rem;border:1px solid #ddd;font-size:1rem}
+#login-btn{width:100%;padding:.75rem;background:var(--magalu-blue);color:var(--white);font-weight:700;border:none;border-radius:.5rem;cursor:pointer}
+#login-btn:hover{transform:scale(1.02)}
+#error-msg{margin-top:.75rem;color:#DC143C;font-weight:700;display:none}
+
+/* Hide other main UI initially */
+#app-wrap{display:none;min-height:100vh;background:var(--bg);position:relative;overflow:hidden}
+
+/* ===== TELA INICIAL ===== */
+#container{
+  text-align:center;
+  padding-top:120px;
+  font-size:36px;
+  font-weight:700;
+  color:#999;
+  text-transform:uppercase;
+}
+#flip{height:50px;overflow:hidden;margin:20px 0;position:relative}
+#flip .wrap{display:flex;flex-direction:column;align-items:center;animation:slide 6s linear infinite}
+#flip .item{display:inline-block;padding:0 20px;height:50px;line-height:50px;border-radius:12px;color:#fff;margin:0 0 10px 0;width:fit-content;white-space:nowrap;text-align:center}
+.item.magalu{background:var(--magalu-blue)}
+.item.engajamento{background:#42c58a}
+.item.bemvindo{background:var(--red)}
+@keyframes slide{0%{transform:translateY(0)}100%{transform:translateY(-180px)}}
+#continue-btn{display:none;margin-top:2.5rem;font-size:1.125rem;font-weight:700;color:var(--white);background:var(--magalu-blue);padding:.75rem 1.6rem;border-radius:.5rem;border:none;cursor:pointer;box-shadow:0 6px 18px rgba(0,0,0,.12);transition:transform .18s ease,filter .18s ease}
+
+/* ===== BACK BUTTON ===== */
+.back-btn {
+  position: fixed;
+  top: 14px;
+  left: 14px;
+  background: var(--red);
+  color: var(--white);
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  z-index: 999;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.18);
+  border: none;
+  font-size: 0.95rem;
+}
+.back-btn span.arrow { font-size: 1rem; transform: translateY(-1px); }
+
+/* ===== CONSULTA ===== */
+#consulta-screen{display:none;min-height:calc(100vh - var(--footer-height));padding:4.5rem 1.25rem 6.25rem 1.25rem;box-sizing:border-box;align-items:center;justify-content:flex-start;flex-direction:column}
+h2{margin-bottom:1.25rem;color:#333;text-align:center;font-size:1.25rem}
+.menu-container{display:flex;gap:1.25rem;flex-wrap:wrap;justify-content:center;margin-bottom:1rem}
+.menu-group{position:relative;text-align:center}
+/* bring the buttons above overlay so they stay clickable while modal is open */
+.menu-btn{padding:.875rem 1.6rem;border-radius:.75rem;font-weight:700;text-transform:uppercase;color:var(--white);cursor:pointer;transition:transform .22s ease;display:inline-flex;align-items:center;justify-content:center;gap:.5rem;white-space:nowrap;position:relative;z-index:130}
+.menu-btn.green{background:#4CAF50}
+.menu-btn.blue{background:#2196F3}
+
+/* transformed dropdown -> centered modal */
+.menu-dropdown{
+  position:fixed;
+  top:50%;
+  left:50%;
+  transform:translate(-50%,-50%);
+  width:min(90vw,520px);
+  max-width:95vw;
+  padding:0;
+  background:#fff;
+  border-radius:.75rem;
+  box-shadow:0 12px 40px rgba(0,0,0,.25);
+  display:none;
+  z-index:120;
+}
+.menu-dropdown.active{display:block}
+.menu-dropdown .menu-zoom-bg{background:#fff;padding:.875rem;border-radius:.75rem;display:flex;flex-direction:column;align-items:center;gap:.75rem;width:100%}
+.menu-dropdown textarea{width:100%;min-height:6rem;padding:.5rem;border-radius:.375rem;border:1px solid #ccc;font-size:.9rem;resize:vertical;outline:none}
+.bevel{display:inline-block;padding:.625rem 1.25rem;background:#f33;color:#fff;font-weight:700;cursor:pointer;border-radius:.375rem;margin-top:.25rem;text-decoration:none;font-size:.95rem}
+
+/* overlay: blocks background; clicking does not close modals (per request) */
+.overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.45);backdrop-filter:blur(6px);display:none;z-index:110;}
+
+/* selected file area */
+#selected-file-container{display:none;flex-direction:column;align-items:center;gap:.5rem;margin-top:0.625rem;font-size:.875rem;color:#333;width:100%;max-width:28rem}
+#remove-file{background:transparent;border:none;cursor:pointer;font-weight:700;color:#F44336;font-size:1rem}
+.consultar-btn{margin-top:.25rem;font-size:1rem;font-weight:700;color:#fff;background:#F44336;padding:.6rem 1.1rem;border-radius:.5rem;cursor:pointer;border:none;display:none}
+.consultar-btn.show{display:inline-block}
+
+/* ===== PROCESSAMENTO ===== */
+#process-screen{display:none;min-height:calc(100vh - var(--footer-height));align-items:center;justify-content:center;position:relative;background:var(--accent);overflow:hidden;padding:2rem 1rem}
+#progress-top{position:absolute;top:1rem;left:50%;transform:translateX(-50%);font-size:1.25rem;font-weight:700;color:var(--white);z-index:100;text-align:center}
+#process-simple{display:none;flex-direction:column;align-items:center;gap:.5rem;color:#fff}
+
+/* loop-wrapper / truck scene */
+.loop-wrapper{margin:0 auto;position:relative;display:block;width:min(92vw,600px);height:250px;overflow:hidden;border-bottom:3px solid var(--white);color:var(--white);background:transparent}
+.mountain { z-index: 1; position:absolute; right:-900px; bottom:-20px; width:2px; height:2px; box-shadow: 0 0 0 50px #4DB6AC, 60px 50px 0 70px #4DB6AC, 90px 90px 0 50px #4DB6AC, 250px 250px 0 50px #4DB6AC, 290px 320px 0 50px #4DB6AC, 320px 400px 0 50px #4DB6AC; transform: rotate(130deg); animation: mtn 20s linear infinite; }
+.hill { z-index: 2; position:absolute; right:-900px; bottom:-50px; width:400px; border-radius:50%; height:20px; box-shadow: 0 0 0 50px #4DB6AC, -20px 0 0 20px #4DB6AC, -90px 0 0 50px #4DB6AC, 250px 0 0 50px #4DB6AC, 290px 0 0 50px #4DB6AC, 620px 0 0 50px #4DB6AC; animation: hill 4s 2s linear infinite; }
+.tree { z-index: 3; position:absolute; height:6.25rem; width:2.2rem; bottom:0; background:url(https://s3-us-west-2.amazonaws.com/s.cdpn.io/130015/tree.svg) no-repeat; background-size:contain; animation: tree 6s linear infinite; }
+.tree:nth-child(2){ animation: tree2 8s linear infinite; }
+.tree:nth-child(3){ animation: tree3 10s linear infinite; }
+.rock { z-index: 4; margin-top:-17%; height:2%; width:2%; bottom:-2px; border-radius:20px; position:absolute; background:#ddd; animation: rock 4s linear infinite; }
+
+/* truck & wheels raised to sit above the street */
+.truck {
+  z-index: 6;
+  transition: all ease;
+  width:5.3125rem; /* 85px */
+  bottom: 12px; /* SUBI: agora o caminhão está sobre a rua */
+  right: 50%;
+  position:absolute;
+  transform: translateX(50%);
+  background: url(https://s3-us-west-2.amazonaws.com/s.cdpn.io/130015/truck.svg) no-repeat center/contain;
+  height:3.75rem; /* 60px */
+  animation: truckJump 4s linear infinite;
+}
+.truck:before{
+  content: " ";
+  position: absolute;
+  width: 25px;
+  box-shadow: -30px 28px 0 1.5px var(--white), -35px 18px 0 1.5px var(--white);
+  animation: wind 1.5s ease infinite;
+}
+
+.wheels {
+  z-index: 7;
+  background: url(https://s3-us-west-2.amazonaws.com/s.cdpn.io/130015/wheels.svg) no-repeat center/contain;
+  background-size: contain;
+  height:0.9375rem; /* 15px */
+  width:5.3125rem;
+  position:absolute;
+  bottom: 6px; /* SUBI: rodas ficam em cima da rua */
+  right: 50%;
+  transform: translateX(50%);
+  animation: truckJump 4s linear infinite;
+}
+
+/* ===== ANIMATIONS ===== */
+@keyframes tree{ 0%{transform:translateX(1200px)} 100%{transform:translateX(-200px)} }
+@keyframes tree2{ 0%{transform:translateX(1400px)} 100%{transform:translateX(-200px)} }
+@keyframes tree3{ 0%{transform:translateX(1600px)} 100%{transform:translateX(-200px)} }
+@keyframes rock{ 0%{ right:-200px } 50%{ right:50% } 100%{ right:1200px } }
+@keyframes truckJump{ 0%,45%{ transform: translateY(0) } 50%{ transform: translateY(-6px) } 55%{ transform: translateY(0) } 100%{ transform: translateY(0) } }
+@keyframes wind{ 50%{ transform: translateY(3px) } }
+@keyframes mtn{ 100%{ transform: translateX(-2000px) rotate(130deg) } }
+@keyframes hill{ 100%{ transform: translateX(-2000px) } }
+
+/* ===== RESULTADOS ===== */
+#result-screen{
+  display: none;
+  min-height: calc(100vh - var(--footer-height));
+  padding: 3.125rem 1rem 2.5rem 1rem;
+  position: relative;
+  overflow: auto;
+}
+
+/* decorative background - image with subtle blur + darken so table pops */
+.body-background{
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: url('https://live.staticflickr.com/65535/51387011301_8794ef8729_b.jpg') center/cover no-repeat;
+  will-change: transform, filter;
+  filter: brightness(0.55) saturate(0.9) blur(6px);
+  backdrop-filter: blur(12px);
+  transform: scale(1.02);
+  z-index: 0;
+}
+
+/* table area in front */
+.table-container{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  margin-top:3.75rem;
+  z-index: 30;
+  position:relative;
+  width:100%;
+}
+
+/* table wrapper: glass effect (iPhone-like) */
+.table-wrapper{
+  overflow-x:auto;
+  overflow-y:auto;
+  max-width:1100px;
+  max-height:calc(60vh);
+  width:95%;
+  padding:0; /* moved padding to inside table so sticky header aligns */
+  border-radius:1rem;
+  background: rgba(255,255,255,0.15);
+  border: 1px solid rgba(255,255,255,0.25);
+  backdrop-filter: blur(20px) saturate(180%) brightness(1.1);
+  box-shadow: 0 12px 40px rgba(0,0,0,0.18);
+  display:block;
+  color: #fff;
+}
+
+/* table styling: white text */
+table{width:100%;min-width:600px;border-collapse:collapse;table-layout:auto;color:#fff;white-space:nowrap;font-size:.95rem}
+thead th { position: sticky; top: 0; z-index: 6; background: rgba(255,255,255,0.35); color: #fff; }
+th,td{padding:.75rem .9375rem;border-bottom:1px solid rgba(0,0,0,0.12);text-align:left;vertical-align:middle;color:#fff}
+th{font-weight:700}
+
+/* small wrapper to keep padding inside so header alignment good */
+.table-inner{padding:1.25rem}
+
+/* export button */
+#export-btn{margin-top:.9375rem;background:var(--accent);color:var(--white);border:none;padding:.625rem 1.25rem;border-radius:.375rem;cursor:pointer;font-size:1rem;z-index:40;position:relative}
+
+/* footer */
+footer{font-size:.75rem;color:var(--white);text-align:center;padding:.5rem 0;background:#4a90e2;display:flex;flex-direction:column;align-items:center;gap:.375rem;width:100%;height:var(--footer-height);position:fixed;bottom:0;left:0;z-index:50}
+footer .social-icons{display:flex;gap:.625rem}
+footer .social-icons a{display:flex;align-items:center;justify-content:center;width:1.75rem;height:1.75rem;border-radius:50%;background:var(--white);color:#4a90e2;text-decoration:none;font-size:.85rem;transition:transform .18s ease}
+
+/* popup */
+#popup-limit{display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:var(--white);padding:1.25rem 1.875rem;border-radius:.75rem;box-shadow:0 6px 20px rgba(0,0,0,.3);z-index:999;max-width:92vw;width:420px;text-align:center}
+#popup-limit h3{margin-bottom:.625rem;color:#f44336;font-size:1.125rem}
+#popup-limit p{margin-bottom:1rem;font-size:.95rem;color:#333}
+#popup-limit button{margin:.25rem;padding:.5rem 1.25rem;border-radius:.375rem;font-weight:700;border:none;cursor:pointer}
+.btn-continue{background:#4CAF50;color:#fff}
+.btn-edit{background:#f44336;color:#fff}
+.cnpj-exceed{color:red;font-weight:700}
+
+/* responsive tweaks */
+@media(max-width:820px){
+  #flip{height:2.75rem}
+  #container{font-size:1.8rem;padding-top:6.5vh}
+  .loop-wrapper{width:100%;height:180px}
+  .table-wrapper{max-height:45vh;padding:0}
+  table{min-width:560px}
+  #selected-file-container{max-width:88%}
+  .menu-dropdown{width:min(90vw,360px)}
+}
+@media(max-width:480px){
+  :root{--base-font:14px}
+  #container{font-size:1.15rem;padding-top:4.5vh}
+  #flip{height:2.25rem}
+  #popup-limit{width:92vw;padding:1rem}
+}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login-container" aria-hidden="false">
+  <div id="login-card" role="dialog" aria-labelledby="loginTitle" aria-modal="true">
+    <h1 id="loginTitle">Login</h1>
+    <div class="input-group">
+      <label for="user">Usuário</label>
+      <input id="user" type="text" placeholder="Digite o usuário" autocomplete="username">
+    </div>
+    <div class="input-group">
+      <label for="pass">Senha</label>
+      <input id="pass" type="password" placeholder="Digite a senha" autocomplete="current-password">
+    </div>
+    <button id="login-btn">Entrar</button>
+    <div id="error-msg">Usuário ou senha incorretos</div>
+  </div>
+</div>
+
+<!-- APP WRAPPER (esconde enquanto não logado) -->
+<div id="app-wrap" aria-hidden="true">
+  <!-- initial "Consulta" screen -->
+  <div id="container">Consulta
+    <div id="flip">
+      <div class="wrap">
+        <div class="item magalu">Magalu</div>
+        <div class="item engajamento">Engajamento</div>
+        <div class="item bemvindo">Bem-vindo</div>
+        <div class="item magalu">Magalu</div>
+        <div class="item engajamento">Engajamento</div>
+        <div class="item bemvindo">Bem-vindo</div>
+      </div>
+    </div>
+    CNPJ!<br>
+    <button id="continue-btn">Continue!</button>
+  </div>
+
+  <!-- CONSULTA SCREEN -->
+  <div id="consulta-screen" aria-hidden="true">
+    <button id="back-consulta" class="back-btn" style="display:none;"><span class="arrow">←</span><span>Volta</span></button>
+    <h2>Consulta de CNPJs</h2>
+    <div class="menu-container">
+      <div class="menu-group">
+        <div class="menu-btn green" data-target="input-cnpjs">Inserir CNPJs</div>
+        <div class="menu-dropdown" id="input-cnpjs">
+          <div class="menu-zoom-bg">
+            <textarea id="cnpjList" placeholder="Digite ou cole os CNPJs, separados por vírgula ou linha"></textarea>
+            <button id="consultar-cnpj" class="consultar-btn" type="button">Consultar</button>
+          </div>
+        </div>
+      </div>
+      <div class="menu-group">
+        <div class="menu-btn blue" data-target="csv-actions">Importar CSV</div>
+        <div class="menu-dropdown" id="csv-actions">
+          <div class="menu-zoom-bg">
+            <label class="bevel" for="csvFile">Selecionar arquivo CSV</label>
+            <input type="file" id="csvFile" accept=".csv" style="display:none;">
+            <a class="bevel" href="#" id="download-model">Baixar Planilha Modelo</a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="selected-file-container">
+      <span id="selected-file"></span>
+      <div>
+        <button id="remove-file" type="button">x</button>
+        <button id="consultar-csv" class="consultar-btn" type="button">Consultar</button>
+      </div>
+    </div>
+
+    <div class="overlay" tabindex="-1" aria-hidden="true"></div>
+  </div>
+
+  <div id="popup-limit" role="dialog" aria-modal="true" style="display:none;">
+    <h3>AVISO!</h3>
+    <p>O site limita a consulta a <strong>30 CNPJs</strong> para evitar erros e bloqueio da API. Os CNPJs excedentes foram destacados em vermelho.</p>
+    <button class="btn-continue" id="continue-limit" type="button">Continuar</button>
+    <button class="btn-edit" id="edit-limit" type="button">Editar</button>
+  </div>
+
+  <div id="process-screen" aria-hidden="true">
+    <div id="process-simple" style="display:flex;flex-direction:column;align-items:center;">
+      <div class="spinner" aria-hidden="true"></div>
+      <div class="status" id="process-simple-status" style="color:white">Processando 0 / 0 — 0%</div>
+    </div>
+    <div id="process-truck" style="display:none;">
+      <div id="progress-top">0%</div>
+      <div class="loop-wrapper" aria-hidden="false">
+        <div class="mountain"></div>
+        <div class="hill"></div>
+        <div class="tree" style="right:-200px;"></div>
+        <div class="tree" style="right:-50px; height:5.25rem;"></div>
+        <div class="tree" style="right:120px; height:6.5rem;"></div>
+        <div class="rock" style="right: -200px;"></div>
+        <div class="truck" id="truck"></div>
+        <div class="wheels" aria-hidden="true"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="result-screen" aria-hidden="true">
+    <button id="back-results" class="back-btn" style="display:none;"><span class="arrow">←</span><span>Volta</span></button>
+
+    <div class="body-background" aria-hidden="true"></div>
+
+    <div class="table-container">
+      <div class="table-wrapper">
+        <div class="table-inner">
+          <table id="data-table" role="table" aria-label="Resultados">
+            <thead></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+      <button id="export-btn" type="button">🟩 Exportar CSV</button>
+    </div>
+  </div>
+
+  <footer>
+    <div class="social-icons">
+      <a href="https://github.com/Felipelias" target="_blank" rel="noopener">G</a>
+      <a href="https://www.linkedin.com/in/felipe-novais-7a069118a" target="_blank" rel="noopener">in</a>
+      <a href="https://wa.me/5516988655053" target="_blank" rel="noopener">W</a>
+    </div>
+    <div>Site criado por <strong>felipe.elias</strong></div>
+  </footer>
+</div>
+
+<script>
+/* ==== CREDENCIAIS (ofuscadas) ====
+// Usuário: Engajamento
+// Senha: Engaja123
+*/
+(function(){
+  // cria CSS var com base64
+  const cssData = document.createElement("style");
+  cssData.innerHTML = ":root{--u:'RW5nYWphbWVudG8=';--p:'RW5nYWphMTIz';}";
+  document.head.appendChild(cssData);
+  function b64decode(str){ return atob(str); }
+  function getUserPass(){
+    const u_b64 = getComputedStyle(document.documentElement).getPropertyValue('--u').replace(/['"]/g,'').trim();
+    const p_b64 = getComputedStyle(document.documentElement).getPropertyValue('--p').replace(/['"]/g,'').trim();
+    return { user: b64decode(u_b64), pass: b64decode(p_b64) };
+  }
+
+  // elementos
+  const loginContainer = document.getElementById('login-container');
+  const userInput = document.getElementById('user');
+  const passInput = document.getElementById('pass');
+  const loginBtn = document.getElementById('login-btn');
+  const errorMsg = document.getElementById('error-msg');
+
+  const appWrap = document.getElementById('app-wrap');
+  const containerEl = document.getElementById('container');
+  const continueBtn = document.getElementById('continue-btn');
+
+  const consultaScreen = document.getElementById("consulta-screen");
+  const processScreen = document.getElementById("process-screen");
+  const resultScreen = document.getElementById("result-screen");
+  const backConsultaBtn = document.getElementById("back-consulta");
+  const backResultsBtn = document.getElementById("back-results");
+
+  const menuBtns = document.querySelectorAll(".menu-btn");
+  const overlay = document.querySelector(".overlay");
+  const inputText = document.getElementById("cnpjList");
+  const csvFileInput = document.getElementById("csvFile");
+  const btnConsultarTxt = document.getElementById("consultar-cnpj");
+  const btnConsultarCSV = document.getElementById("consultar-csv");
+  const selectedFileContainer = document.getElementById("selected-file-container");
+  const selectedFileLabel = document.getElementById("selected-file");
+  const removeFileBtn = document.getElementById("remove-file");
+  const tableHead = document.querySelector("#data-table thead");
+  const tableBody = document.querySelector("#data-table tbody");
+  const exportBtn = document.getElementById("export-btn");
+  const progressTop = document.getElementById("progress-top");
+  const processSimpleStatus = document.getElementById("process-simple-status");
+  const popupLimit = document.getElementById("popup-limit");
+  const continueLimitBtn = document.getElementById("continue-limit");
+  const editLimitBtn = document.getElementById("edit-limit");
+  const downloadModel = document.getElementById("download-model");
+
+  // configs
+  var MODEL_CSV_URL = "https://raw.githubusercontent.com/Felipelias/modelo_cnpj/1ea096f1e4c8aef34ac47f2db20d0ceecc10c79c/Modelo_cnpjs.csv";
+  var BRASILAPI_BASE = "https://brasilapi.com.br/api/cnpj/v1/";
+  var MAX_CNPJ = 30;
+  var EXPORT_FILENAME = "resultados_cnpjs.csv";
+  var NO_VALID_CNPJ_MSG = "Nenhum CNPJ válido!";
+
+  if (downloadModel) downloadModel.setAttribute("href", MODEL_CSV_URL);
+
+  // força logout na recarga (usuário pediu que sempre volte ao login)
+  sessionStorage.removeItem('loggedIn');
+
+  // mostra login
+  function showLogin(){
+    appWrap.style.display = 'none';
+    appWrap.setAttribute('aria-hidden','true');
+    loginContainer.style.display = 'flex';
+    loginContainer.setAttribute('aria-hidden','false');
+    userInput.value = '';
+    passInput.value = '';
+    errorMsg.style.display = 'none';
+    setTimeout(()=>userInput.focus(),80);
+    if(location.hash && location.hash !== '') history.replaceState(null,'',location.pathname+location.search);
+  }
+
+  // mostra app (não avança automaticamente)
+  function revealAppAndGotoInitial(){
+    loginContainer.style.display = 'none';
+    loginContainer.setAttribute('aria-hidden','true');
+    appWrap.style.display = 'block';
+    appWrap.setAttribute('aria-hidden','false');
+    // exibe a tela inicial ("Consulta") e mostra o botão Continue só após 2s
+    containerEl.style.display = 'block';
+    continueBtn.style.display = 'none';
+    setTimeout(function(){ continueBtn.style.display = 'inline-block'; }, 2000);
+  }
+
+  // autenticação
+  loginBtn.addEventListener('click', function(){
+    const inputUser = userInput.value.trim();
+    const inputPass = passInput.value.trim();
+    const creds = getUserPass();
+    if(inputUser === creds.user && inputPass === creds.pass){
+      sessionStorage.setItem('loggedIn','true');
+      errorMsg.style.display = 'none';
+      revealAppAndGotoInitial();
+      // NÃO chamamos showConsulta() automaticamente — só avança quando o usuário clicar em Continue!
+    } else {
+      errorMsg.style.display = 'block';
+    }
+  });
+
+  [userInput, passInput].forEach(function(el){
+    el.addEventListener('keydown', function(e){
+      if(e.key === 'Enter') { loginBtn.click(); }
+    });
+  });
+
+  // navegação segura (verifica login)
+  function isLoggedIn(){ return sessionStorage.getItem('loggedIn') === 'true'; }
+
+  function showInitial(){
+    if(!isLoggedIn()){ showLogin(); return; }
+    containerEl.style.display = "block";
+    consultaScreen.style.display = "none";
+    processScreen.style.display = "none";
+    resultScreen.style.display = "none";
+    backConsultaBtn.style.display = "none";
+    backResultsBtn.style.display = "none";
+  }
+  function showConsulta(){
+    if(!isLoggedIn()){ showLogin(); return; }
+    containerEl.style.display = "none";
+    consultaScreen.style.display = "flex";
+    processScreen.style.display = "none";
+    resultScreen.style.display = "none";
+    backConsultaBtn.style.display = "flex";
+    backResultsBtn.style.display = "none";
+    // não fecha automaticamente dropdowns aqui; fechar é feito pelo próprio botão (toggle)
+  }
+  function showProcess(useTruck){
+    if(!isLoggedIn()){ showLogin(); return; }
+    containerEl.style.display = "none";
+    consultaScreen.style.display = "none";
+    resultScreen.style.display = "none";
+    processScreen.style.display = "flex";
+    if (useTruck) {
+      document.getElementById("process-simple").style.display = "none";
+      document.getElementById("process-truck").style.display = "block";
+    } else {
+      document.getElementById("process-simple").style.display = "flex";
+      document.getElementById("process-truck").style.display = "none";
+    }
+    backConsultaBtn.style.display = "none";
+    backResultsBtn.style.display = "none";
+  }
+  function showResults(){
+    if(!isLoggedIn()){ showLogin(); return; }
+    containerEl.style.display = "none";
+    consultaScreen.style.display = "none";
+    processScreen.style.display = "none";
+    resultScreen.style.display = "block";
+    backResultsBtn.style.display = "flex";
+    backConsultaBtn.style.display = "none";
+    var bg = document.querySelector('.body-background');
+    if(bg) bg.style.display = 'block';
+  }
+
+  // Continue! só avança quando clicado
+  continueBtn.addEventListener('click', showConsulta);
+  backConsultaBtn.addEventListener('click', function(){ showInitial(); });
+  backResultsBtn.addEventListener('click', showConsulta);
+
+  // dropdowns (agora fungem como modais centralizados) - toggle só pelo botão
+  function closeAllDropdowns(){
+    document.querySelectorAll(".menu-dropdown").forEach(function (d) { d.classList.remove("active"); });
+    document.querySelectorAll(".menu-group").forEach(function (g) { g.classList.remove("zoom"); });
+    overlay.style.display = "none";
+  }
+
+  menuBtns.forEach(function (btn) {
+    btn.addEventListener("click", function (e) {
+      e.stopPropagation();
+      var targetId = btn.dataset.target;
+      var dropdown = document.getElementById(targetId);
+      var isActive = dropdown.classList.contains("active");
+      if (isActive) {
+        dropdown.classList.remove("active");
+        btn.parentElement.classList.remove("zoom");
+        overlay.style.display = "none";
+      } else {
+        // fecha outros e abre este
+        document.querySelectorAll(".menu-dropdown").forEach(function (d) { d.classList.remove("active"); });
+        document.querySelectorAll(".menu-group").forEach(function (g) { g.classList.remove("zoom"); });
+        dropdown.classList.add("active");
+        btn.parentElement.classList.add("zoom");
+        overlay.style.display = "block";
+      }
+    });
+  });
+
+  // overlay não fecha os modais quando clicado (pedido)
+  overlay.addEventListener('click', function(e){ e.stopPropagation(); });
+
+  // evita bubbling na textarea
+  if (inputText) inputText.addEventListener("click", function (e) { e.stopPropagation(); });
+
+  // arquivo CSV e botões Consultar visibility
+  function toggleConsultarButtons() {
+    if (inputText && inputText.value.trim().length > 0) btnConsultarTxt.classList.add("show"); else if(btnConsultarTxt) btnConsultarTxt.classList.remove("show");
+    if (csvFileInput && csvFileInput.files && csvFileInput.files.length > 0) {
+      btnConsultarCSV.classList.add("show");
+      selectedFileContainer.style.display = "flex";
+    } else {
+      btnConsultarCSV.classList.remove("show");
+      selectedFileContainer.style.display = "none";
+    }
+  }
+  if (inputText) inputText.addEventListener("input", toggleConsultarButtons);
+  if (csvFileInput) csvFileInput.addEventListener("change", function () {
+    if (csvFileInput.files.length > 0) {
+      selectedFileLabel.textContent = csvFileInput.files[0].name;
+      selectedFileContainer.style.display = "flex";
+      // não fecha tudo automaticamente — mas escondemos o modal para mostrar seleção
+      document.querySelectorAll(".menu-dropdown").forEach(function (d) { d.classList.remove("active"); });
+      overlay.style.display = "none";
+      btnConsultarCSV.classList.add("show");
+    } else {
+      selectedFileLabel.textContent = "";
+      selectedFileContainer.style.display = "none";
+      btnConsultarCSV.classList.remove("show");
+    }
+  });
+  if (removeFileBtn) removeFileBtn.addEventListener("click", function () {
+    csvFileInput.value = "";
+    selectedFileLabel.textContent = "";
+    selectedFileContainer.style.display = "none";
+    btnConsultarCSV.classList.remove("show");
+    toggleConsultarButtons();
+  });
+
+  // helpers
+  function onlyDigits(str) { return String(str || "").replace(/\D/g, ""); }
+
+  // popup limit handling
+  function validarLim(cnps, callback) {
+    if (cnps.length > MAX_CNPJ) {
+      var permitted = cnps.slice(0, MAX_CNPJ);
+      var extras = cnps.slice(MAX_CNPJ);
+      popupLimit.style.display = "flex";
+      continueLimitBtn.onclick = function () {
+        popupLimit.style.display = "none";
+        callback(permitted);
+      };
+      editLimitBtn.onclick = function () {
+        popupLimit.style.display = "none";
+        inputText.value = permitted.concat(extras.map(function (c) { return "**" + c + "**"; })).join("\n");
+        toggleConsultarButtons();
+        // reabre modal inserir cnpjs para edição
+        document.querySelectorAll(".menu-dropdown").forEach(function (d) { d.classList.remove("active"); });
+        document.getElementById('input-cnpjs').classList.add('active');
+        overlay.style.display = 'block';
+      };
+    } else {
+      callback(cnps);
+    }
+  }
+
+  // fetch BrasilAPI
+  async function fetchCnpj(cnpj) {
+    try {
+      var res = await fetch(BRASILAPI_BASE + cnpj);
+      if (!res.ok) {
+        var text = await res.text().catch(function () { return null; });
+        return { cnpj: cnpj, error: true, message: res.status + " " + (text || res.statusText) };
+      }
+      var j = await res.json();
+      var sociosList = (j.qsa || []).map(function (s) { return s.nome_socio || s.nome || ""; }).filter(Boolean).join(", ");
+      return {
+        cnpj: j.cnpj || cnpj,
+        razao_social: j.razao_social || j.nome || "",
+        nome_fantasia: j.nome_fantasia || "",
+        ddd_telefone_1: j.ddd_telefone_1 || j.ddd || "",
+        ddd_telefone_2: j.ddd_telefone_2 || "",
+        ddd_fax: j.ddd_fax || "",
+        nomes_socio: sociosList
+      };
+    } catch (err) {
+      return { cnpj: cnpj, error: true, message: err.message || "Erro" };
+    }
+  }
+
+  // tempo estimado (apenas informativo)
+  function updateTempoText(minS, maxS) {
+    var minM = Math.floor(minS / 60), minSs = minS % 60;
+    var maxM = Math.floor(maxS / 60), maxSs = maxS % 60;
+    var txt = "Tempo restante estimado: " + minM + ":" + String(minSs).padStart(2, "0") + " a " + maxM + ":" + String(maxSs).padStart(2, "0");
+    if (document.getElementById("process-simple").style.display === "flex") {
+      var base = processSimpleStatus.textContent.split("—")[0];
+      processSimpleStatus.textContent = base + "— " + txt;
+    } else {
+      var base2 = progressTop.textContent.split("...")[0];
+      progressTop.textContent = base2 + "... " + txt;
+    }
+  }
+
+  function updateProgressText(current, total) {
+    progressTop.textContent = "Processando " + current + "/" + total + "...";
+  }
+
+  // fill table
+  function escapeHtml(str) {
+    return String(str || "").replace(/[&<>\"'=\/]/g, function (s) {
+      return {
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;',
+        '/': '&#x2F;',
+        '': '&#x60;',
+        '=': '&#x3D;'
+      }[s];
+    });
+  }
+  function fillTable(results) {
+    tableHead.innerHTML = "";
+    tableBody.innerHTML = "";
+    if (!results || results.length === 0) return;
+
+    var headers = ["CNPJ", "Razão Social", "Nome Fantasia", "Telefone 1", "Telefone 2", "DDD Fax", "Nome Sócios"];
+    var trHead = document.createElement("tr");
+    headers.forEach(function (h) {
+      var th = document.createElement("th");
+      th.textContent = h;
+      trHead.appendChild(th);
+    });
+    tableHead.appendChild(trHead);
+
+    results.forEach(function (r) {
+      var tr = document.createElement("tr");
+      var cnpj = r.cnpj || "";
+      var razao = r.razao_social || "";
+      var fantasia = r.nome_fantasia || "";
+      var tel1 = r.ddd_telefone_1 || "";
+      var tel2 = r.ddd_telefone_2 || "";
+      var fax = r.ddd_fax || "";
+      var socios = r.nomes_socio || (r.nomes_socio === "" ? "" : (r.qsa ? (r.qsa.map(function(s){return s.nome_socio||"";}).join(", ")) : ""));
+      tr.innerHTML = "" +
+        "<td>" + escapeHtml(cnpj) + "</td>" +
+        "<td>" + escapeHtml(razao) + "</td>" +
+        "<td>" + escapeHtml(fantasia) + "</td>" +
+        "<td>" + escapeHtml(tel1) + "</td>" +
+        "<td>" + escapeHtml(tel2) + "</td>" +
+        "<td>" + escapeHtml(fax) + "</td>" +
+        "<td>" + escapeHtml(socios) + "</td>";
+      tableBody.appendChild(tr);
+    });
+  }
+
+  // export CSV
+  if (exportBtn) exportBtn.addEventListener("click", function () {
+    var resultados = JSON.parse(localStorage.getItem("resultados") || "[]") || [];
+    if (!resultados.length) return;
+    var cols = ['cnpj', 'razao_social', 'nome_fantasia', 'ddd_telefone_1', 'ddd_telefone_2', 'ddd_fax', 'nomes_socio'];
+    var headers = ['CNPJ', 'Razão Social', 'Nome Fantasia', 'Telefone 1', 'Telefone 2', 'DDD Fax', 'Nome Sócios'];
+    var lines = [];
+    lines.push(headers.join(','));
+    resultados.forEach(function (r) {
+      var row = cols.map(function (c) {
+        var v = r[c] || "";
+        return '"' + String(v).replace(/"/g, '""') + '"';
+      }).join(',');
+      lines.push(row);
+    });
+    var blob = new Blob([lines.join("\n")], { type: 'text/csv;charset=utf-8;' });
+    var link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = EXPORT_FILENAME;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  });
+
+  // processamento principal
+  async function processCnpjs(cnpjs) {
+    try { localStorage.removeItem("resultados"); } catch (e) { /* ignore */ }
+    var useTruck = cnpjs.length > 2;
+    showProcess(useTruck);
+    var results = [];
+    progressTop.textContent = "Processando 0/" + cnpjs.length;
+    processSimpleStatus.textContent = "Processando 0 / " + cnpjs.length + " — 0%";
+
+    for (var i = 0; i < cnpjs.length; i++) {
+      var cnpj = cnpjs[i];
+      var start = Date.now();
+      var data = await fetchCnpj(cnpj);
+      var elapsed = Math.floor((Date.now() - start) / 1000);
+      results.push(data);
+
+      var delay = Math.floor(Math.random() * 6) + 1;
+      var totalDelay = elapsed + delay;
+      var pct = Math.floor(((i + 1) / cnpjs.length) * 100);
+
+      if (useTruck) {
+        updateProgressText(i + 1, cnpjs.length);
+      } else {
+        processSimpleStatus.textContent = "Processando " + (i + 1) + " / " + cnpjs.length + " — " + pct + "%";
+      }
+
+      var minTempo = totalDelay * (cnpjs.length - i - 1);
+      var maxTempo = (totalDelay + 5) * (cnpjs.length - i - 1);
+      updateTempoText(minTempo, maxTempo);
+
+      if (i < cnpjs.length - 1) {
+        await new Promise(function (res) { setTimeout(res, delay * 1000); });
+      }
+    }
+
+    try { localStorage.setItem("resultados", JSON.stringify(results)); } catch (e) { /* ignore */ }
+    fillTable(results);
+    showResults();
+  }
+
+  // consultar textarea
+  if (btnConsultarTxt) btnConsultarTxt.addEventListener("click", function () {
+    var cnps = inputText.value.split(/[\n,;,]+/).map(function (c) { return onlyDigits(c); }).filter(Boolean);
+    if (cnps.length === 0) { alert(NO_VALID_CNPJ_MSG); return; }
+    validarLim(cnps, function (valid) {
+      try { localStorage.setItem("cnpjs", JSON.stringify(valid)); } catch (e) { /* ignore */ }
+      inputText.value = "";
+      // fecha modal
+      document.getElementById('input-cnpjs').classList.remove('active');
+      overlay.style.display = 'none';
+      processCnpjs(valid);
+    });
+  });
+
+  // consultar CSV
+  if (btnConsultarCSV) btnConsultarCSV.addEventListener("click", async function () {
+    var cnps = [];
+    if (csvFileInput.files.length > 0) {
+      var text = await csvFileInput.files[0].text();
+      var parsed = Papa.parse(text, { delimiter: ",", skipEmptyLines: true, dynamicTyping: false });
+      parsed.data.forEach(function (row) {
+        row.forEach(function (cell) {
+          if (cell) cnps.push(onlyDigits(cell));
+        });
+      });
+    }
+    cnps = cnps.filter(Boolean);
+    if (cnps.length === 0) { alert(NO_VALID_CNPJ_MSG); return; }
+    validarLim(cnps, function (valid) {
+      try { localStorage.setItem("cnpjs", JSON.stringify(valid)); } catch (e) { /* ignore */ }
+      // fecha modal CSV
+      document.getElementById('csv-actions').classList.remove('active');
+      overlay.style.display = 'none';
+      processCnpjs(valid);
+    });
+  });
+
+  // keyboard: Esc fecha modals / popup (a pedido mantido)
+  window.addEventListener("keydown", function (e) {
+    if (e.key === "Escape") {
+      document.querySelectorAll(".menu-dropdown").forEach(function (d) { d.classList.remove("active"); });
+      document.querySelectorAll(".menu-group").forEach(function (g) { g.classList.remove("zoom"); });
+      overlay.style.display = "none";
+      popupLimit.style.display = "none";
+    }
+  });
+
+  // bloqueia acessar telas sem login
+  function enforceLoginOnNavigation(){
+    if(!isLoggedIn()){
+      showLogin();
+    }
+  }
+  window.addEventListener('load', enforceLoginOnNavigation);
+  window.addEventListener('hashchange', enforceLoginOnNavigation);
+
+  // download modelo
+  document.getElementById("download-model").addEventListener("click", function(e) {
+    e.preventDefault();
+    fetch(MODEL_CSV_URL)
+      .then(res => res.blob())
+      .then(blob => {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "Modelo_cnpjs.csv";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      })
+      .catch(err => alert("Erro ao baixar a planilha modelo: " + err));
+  });
+
+})();
+</script>
+</body>
+</html>
